@@ -5,7 +5,7 @@ type JsonFormatResult = {
 	sourceKind: 'json' | 'json_str';
 };
 
-const processingDocuments = new Set<string>();
+const formatInFlight = new Set<string>();
 let outputChannel: vscode.OutputChannel | undefined;
 
 function logInfo(message: string): void {
@@ -90,18 +90,40 @@ function shouldAutoFormatDocument(document: vscode.TextDocument): boolean {
 	return document.languageId === 'plaintext';
 }
 
+function firstNonWhitespaceChar(text: string): string | undefined {
+	for (let i = 0; i < text.length; i++) {
+		const ch = text.charCodeAt(i);
+		if (ch !== 0x20 && ch !== 0x09 && ch !== 0x0a && ch !== 0x0d) {
+			return text[i];
+		}
+	}
+	return undefined;
+}
+
 function isWholeDocumentPaste(event: vscode.TextDocumentChangeEvent): boolean {
 	if (event.contentChanges.length !== 1) {
 		return false;
 	}
 
 	const change = event.contentChanges[0];
-	const insertedText = change.text.trim();
-	if (insertedText.length === 0) {
+
+	// Cheap filter 1: a whole-document replacement must start at offset 0.
+	// Any edit in the middle/end of the document fails here without touching getText().
+	if (change.rangeOffset !== 0) {
 		return false;
 	}
 
-	return event.document.getText().trim() === insertedText;
+	const inserted = change.text;
+
+	// Cheap filter 2: the inserted text must start with a JSON container or string opener.
+	// formatJsonOrJsonString would reject anything else, so this is behavior-equivalent.
+	const head = firstNonWhitespaceChar(inserted);
+	if (head !== '{' && head !== '[' && head !== '"') {
+		return false;
+	}
+
+	// Only now do the expensive full-document comparison.
+	return event.document.getText().trim() === inserted.trim();
 }
 
 function findVisibleEditor(document: vscode.TextDocument): vscode.TextEditor | undefined {
@@ -110,13 +132,21 @@ function findVisibleEditor(document: vscode.TextDocument): vscode.TextEditor | u
 	});
 }
 
+function getDocumentEndPosition(document: vscode.TextDocument): vscode.Position {
+	return document.lineAt(document.lineCount - 1).range.end;
+}
+
+function getFullDocumentRange(document: vscode.TextDocument): vscode.Range {
+	return new vscode.Range(new vscode.Position(0, 0), getDocumentEndPosition(document));
+}
+
 function revealDocumentEnd(document: vscode.TextDocument): void {
 	const editor = findVisibleEditor(document);
 	if (!editor) {
 		return;
 	}
 
-	const endPosition = document.positionAt(document.getText().length);
+	const endPosition = getDocumentEndPosition(document);
 	const endRange = new vscode.Range(endPosition, endPosition);
 	editor.selection = new vscode.Selection(endPosition, endPosition);
 	editor.revealRange(endRange, vscode.TextEditorRevealType.Default);
@@ -124,10 +154,7 @@ function revealDocumentEnd(document: vscode.TextDocument): void {
 
 async function replaceEditorText(editor: vscode.TextEditor, text: string): Promise<boolean> {
 	const document = editor.document;
-	const fullRange = new vscode.Range(
-		document.positionAt(0),
-		document.positionAt(document.getText().length)
-	);
+	const fullRange = getFullDocumentRange(document);
 	const replaced = await editor.edit((editBuilder) => {
 		editBuilder.replace(fullRange, text);
 	});
@@ -140,27 +167,14 @@ async function replaceEditorText(editor: vscode.TextEditor, text: string): Promi
 }
 
 async function switchToJsonAndReplace(document: vscode.TextDocument, formatted: string): Promise<void> {
-	const documentKey = document.uri.toString();
-	if (processingDocuments.has(documentKey)) {
-		return;
-	}
-
-	processingDocuments.add(documentKey);
-	try {
-		const jsonDocument = document.languageId === 'json'
-			? document
-			: await vscode.languages.setTextDocumentLanguage(document, 'json');
-		const fullRange = new vscode.Range(
-			jsonDocument.positionAt(0),
-			jsonDocument.positionAt(jsonDocument.getText().length)
-		);
-		const edit = new vscode.WorkspaceEdit();
-		edit.replace(jsonDocument.uri, fullRange, formatted);
-		await vscode.workspace.applyEdit(edit);
-		revealDocumentEnd(jsonDocument);
-	} finally {
-		processingDocuments.delete(documentKey);
-	}
+	const jsonDocument = document.languageId === 'json'
+		? document
+		: await vscode.languages.setTextDocumentLanguage(document, 'json');
+	const fullRange = getFullDocumentRange(jsonDocument);
+	const edit = new vscode.WorkspaceEdit();
+	edit.replace(jsonDocument.uri, fullRange, formatted);
+	await vscode.workspace.applyEdit(edit);
+	revealDocumentEnd(jsonDocument);
 }
 
 async function formatDocumentIfPossible(document: vscode.TextDocument, requirePlainText = true): Promise<boolean> {
@@ -227,13 +241,25 @@ export function activate(context: vscode.ExtensionContext) {
 	logInfo('Activated.');
 
 	const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
-		if (!isWholeDocumentPaste(event) || !shouldAutoFormatDocument(event.document)) {
+		const documentKey = event.document.uri.toString();
+		// Short-circuit any change events fired while we are mid-format on the same document.
+		// This catches our own applyEdit echo, language-switch echoes, and any user keystrokes
+		// landing during the async format window.
+		if (formatInFlight.has(documentKey)) {
+			return;
+		}
+		if (!shouldAutoFormatDocument(event.document) || !isWholeDocumentPaste(event)) {
 			return;
 		}
 
-		formatDocumentIfPossible(event.document).then(undefined, (error: unknown) => {
-			logError('Failed to format pasted JSON.', error);
-		});
+		formatInFlight.add(documentKey);
+		formatDocumentIfPossible(event.document)
+			.catch((error: unknown) => {
+				logError('Failed to format pasted JSON.', error);
+			})
+			.finally(() => {
+				formatInFlight.delete(documentKey);
+			});
 	});
 
 	const toggleDisposable = vscode.commands.registerCommand(
