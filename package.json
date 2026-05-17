@@ -1,13 +1,38 @@
 {
   "name": "better-json-explorer",
   "displayName": "BetterJsonExplorer",
-  "description": "Interactive JSON explorer with tree view",
+  "description": "智能 JSON 体验：粘贴自动识别、JSON ⇄ 字符串切换、嵌套 JSON 字符串解析、字符串值 Hover 预览（JSON / Markdown / 纯文本）。",
   "icon": "images/icon.png",
   "version": "0.1.0",
+  "publisher": "zeke-chin",
+  "license": "MIT",
+  "author": {
+    "name": "zeke-chin"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zeke-chin/better-json-explorer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zeke-chin/better-json-explorer/issues"
+  },
+  "homepage": "https://github.com/zeke-chin/better-json-explorer#readme",
+  "keywords": [
+    "json",
+    "jsonc",
+    "formatter",
+    "viewer",
+    "hover",
+    "nested-json",
+    "markdown",
+    "preview"
+  ],
   "engines": {
     "vscode": "^1.105.0"
   },
   "categories": [
+    "Formatters",
+    "Visualization",
     "Other"
   ],
   "activationEvents": [
@@ -42,19 +67,22 @@
     "watch": "tsc -watch -p ./",
     "pretest": "yarn run compile && yarn run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "package": "vsce package --no-yarn",
+    "publish:vsce": "vsce publish --no-yarn",
+    "publish:ovsx": "ovsx publish --no-dependencies"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
-    "@types/vscode": "^1.120.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
+    "@types/vscode": "1.105.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.3",
     "typescript": "^5.9.3",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "typescript-eslint": "^8.56.1"
   }
 }
