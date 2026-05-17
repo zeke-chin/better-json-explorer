@@ -50,7 +50,7 @@ yarn package          # vsce 本地打包出 .vsix
 - Yarn 包管理器（`.yarnrc` 设置 `--ignore-engines true`）
 - ESLint 9 + typescript-eslint
 - 运行时依赖：`jsonc-parser ^3.3.1`（VS Code 自身也在用，做位置精确的 AST 解析含 JSONC 容错）
-- `engines.vscode`: `^1.120.0`，`@types/vscode` 必须 ≤ 此版本（caret 范围内最大解析值不能超过 engines）
+- `engines.vscode`: `^1.105.0`，`@types/vscode` 用**精确版本** `1.105.0` 锁住（caret 范围会解析到 1.120.x，与 engines 不匹配会被 vsce 拒绝）
 
 ## 开发注意事项
 
