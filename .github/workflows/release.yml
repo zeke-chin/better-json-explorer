@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Verify tag matches package.json version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match package.json $PKG_VERSION"
+            exit 1
+          fi
+          echo "Releasing $PKG_VERSION"
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Compile
+        run: yarn compile
+
+      - name: Test
+        run: xvfb-run -a yarn test
+
+      - name: Package extension
+        run: npx --yes @vscode/vsce package --out "better-json-explorer-${GITHUB_REF_NAME#v}.vsix"
+
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
+        run: npx --yes @vscode/vsce publish --pat "$VSCE_PAT"
+
+      - name: Skip VS Code Marketplace
+        if: env.VSCE_PAT == ''
+        run: echo "::warning::VSCE_PAT secret not set; skipped Marketplace publish."
+
+      - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
+        run: npx --yes ovsx publish *.vsix --pat "$OVSX_PAT"
+
+      - name: Skip Open VSX
+        if: env.OVSX_PAT == ''
+        run: echo "::warning::OVSX_PAT secret not set; skipped Open VSX publish."
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.vsix'
+          generate_release_notes: true
+          body: |
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            Install:
+            - VS Code: search **better-json-explorer** in the Extensions panel
+            - VSCodium / Cursor / Code-OSS: install from [Open VSX](https://open-vsx.org/extension/zeke-chin/better-json-explorer)
+            - Manual: download the `.vsix` attached below and run `code --install-extension <file>.vsix`
