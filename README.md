@@ -1,6 +1,21 @@
+<p align="center">
+  <img src="images/icon.png" alt="BetterJsonExplorer" width="160" />
+</p>
+
 # BetterJsonExplorer
 
 VS Code 扩展：更好的 JSON 预览与编辑工具。
+
+## 功能演示
+
+### 1. 智能识别与格式化
+![Auto Paste Format](images/auto-paste-format.gif)
+
+### 2. JSON 格式一键切换 (Cmd+;)
+![Toggle Format](images/json-string-toggle.gif)
+
+### 3. 任意字符串 Hover 预览与嵌套解析
+![Smart Hover Preview](images/smart-hover-preview.gif)
 
 ## 功能
 
