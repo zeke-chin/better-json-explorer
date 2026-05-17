@@ -3,7 +3,7 @@
   "displayName": "BetterJsonExplorer",
   "description": "智能 JSON 体验：粘贴自动识别、JSON ⇄ 字符串切换、嵌套 JSON 字符串解析、字符串值 Hover 预览（JSON / Markdown / 纯文本）。",
   "icon": "images/icon.png",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "zeke-chin",
   "license": "MIT",
   "author": {

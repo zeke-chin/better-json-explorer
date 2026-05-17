@@ -2,6 +2,11 @@
 
 本扩展遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.1.1] - 2026-05-17
+
+### Fixed
+- 修复在 Cursor / Code-OSS 等环境激活时报 `Cannot find module 'jsonc-parser'`：之前的 `.vscodeignore` 错误地排除了整个 `node_modules/`，导致生产依赖未随 .vsix 一起发布。现在交由 vsce 默认行为自动包含生产依赖。
+
 ## [0.1.0] - 2026-05-17
 
 ### Added
