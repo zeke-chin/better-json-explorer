@@ -1,89 +1,18 @@
 import * as vscode from 'vscode';
-
-type JsonFormatResult = {
-	formatted: string;
-	sourceKind: 'json' | 'json_str';
-};
+import { initLogger, logError, logInfo } from './logger';
+import { formatJsonOrJsonString, stringifyJsonText } from './jsonUtils';
+import { NestedJsonHoverProvider } from './hoverProvider';
+import {
+	NestedJsonCodeLensProvider,
+	OpenKind,
+	PARSE_COMMAND_ID,
+	parseNestedJsonCommand,
+} from './codeLensProvider';
 
 const formatInFlight = new Set<string>();
-let outputChannel: vscode.OutputChannel | undefined;
-
-function logInfo(message: string): void {
-	const line = `[BetterJsonExplorer] ${message}`;
-	console.log(line);
-	outputChannel?.appendLine(line);
-}
-
-function logError(message: string, error: unknown): void {
-	const line = `[BetterJsonExplorer] ${message}`;
-	console.error(line, error);
-	outputChannel?.appendLine(line);
-	outputChannel?.appendLine(error instanceof Error ? error.stack ?? error.message : String(error));
-}
-
-function isJsonContainer(value: unknown): value is Record<string, unknown> | unknown[] {
-	return value !== null && typeof value === 'object';
-}
 
 function isJsonLanguage(document: vscode.TextDocument): boolean {
 	return document.languageId === 'json' || document.languageId === 'jsonc';
-}
-
-function formatJsonOrJsonString(text: string): JsonFormatResult | undefined {
-	const trimmed = text.trim();
-	if (trimmed.length === 0) {
-		return undefined;
-	}
-
-	let candidate = trimmed;
-	let parsedFromString = false;
-
-	for (let depth = 0; depth < 4; depth++) {
-		try {
-			const parsed: unknown = JSON.parse(candidate);
-
-			if (isJsonContainer(parsed)) {
-				return {
-					formatted: JSON.stringify(parsed, null, '\t'),
-					sourceKind: parsedFromString ? 'json_str' : 'json',
-				};
-			}
-
-			if (typeof parsed !== 'string') {
-				return undefined;
-			}
-
-			const nextCandidate = parsed.trim();
-			if (nextCandidate.length === 0 || nextCandidate === candidate) {
-				return undefined;
-			}
-
-			candidate = nextCandidate;
-			parsedFromString = true;
-		} catch {
-			return undefined;
-		}
-	}
-
-	return undefined;
-}
-
-function stringifyJsonText(text: string): string | undefined {
-	const trimmed = text.trim();
-	if (trimmed.length === 0) {
-		return undefined;
-	}
-
-	try {
-		const parsed: unknown = JSON.parse(trimmed);
-		if (!isJsonContainer(parsed)) {
-			return undefined;
-		}
-
-		return JSON.stringify(JSON.stringify(parsed));
-	} catch {
-		return undefined;
-	}
 }
 
 function shouldAutoFormatDocument(document: vscode.TextDocument): boolean {
@@ -237,7 +166,7 @@ async function toggleActiveJsonEditor(): Promise<void> {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-	outputChannel = vscode.window.createOutputChannel('BetterJsonExplorer');
+	const outputChannel = initLogger();
 	logInfo('Activated.');
 
 	const changeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
@@ -271,10 +200,37 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
+	const parseNestedDisposable = vscode.commands.registerCommand(
+		PARSE_COMMAND_ID,
+		(content: string, keyPath: string, kind: OpenKind = 'json') => {
+			parseNestedJsonCommand(content, keyPath, kind).then(undefined, (error: unknown) => {
+				logError('Failed to open parsed content document.', error);
+			});
+		}
+	);
+
+	const jsonSelector: vscode.DocumentSelector = [
+		{ language: 'json' },
+		{ language: 'jsonc' },
+	];
+
+	const hoverDisposable = vscode.languages.registerHoverProvider(
+		jsonSelector,
+		new NestedJsonHoverProvider()
+	);
+
+	const codeLensDisposable = vscode.languages.registerCodeLensProvider(
+		jsonSelector,
+		new NestedJsonCodeLensProvider()
+	);
+
 	context.subscriptions.push(
 		outputChannel,
 		changeDisposable,
-		toggleDisposable
+		toggleDisposable,
+		parseNestedDisposable,
+		hoverDisposable,
+		codeLensDisposable
 	);
 }
 

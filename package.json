@@ -2,7 +2,7 @@
   "name": "better-json-explorer",
   "displayName": "BetterJsonExplorer",
   "description": "Interactive JSON explorer with tree view",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.105.0"
   },
@@ -20,6 +20,10 @@
       {
         "command": "better-json-explorer.toggleCurrentDocument",
         "title": "BetterJsonExplorer: Toggle Current Document JSON Format/String"
+      },
+      {
+        "command": "better-json-explorer.parseNestedJson",
+        "title": "BetterJsonExplorer: Parse Nested JSON String"
       }
     ],
     "keybindings": [
@@ -38,6 +42,9 @@
     "pretest": "yarn run compile && yarn run lint",
     "lint": "eslint src",
     "test": "vscode-test"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.120.0",
