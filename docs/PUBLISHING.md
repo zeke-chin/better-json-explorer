@@ -85,9 +85,9 @@ git push origin main --follow-tags
 1. **版本校验** — git tag 与 `package.json` 版本必须一致，否则 fail
 2. **完整测试** — `yarn lint && yarn compile && xvfb-run yarn test`
 3. **打包** — `vsce package`，输出 `better-json-explorer-X.Y.Z.vsix`
-4. **Marketplace 发布**（仅 `VSCE_PAT` 存在时）
-5. **Open VSX 发布**（仅 `OVSX_PAT` 存在时）
-6. **GitHub Release** — 创建 Release，附带 `.vsix` 文件 + 自动生成的 commit 列表
+4. **Marketplace 发布**（仅 `VSCE_PAT` 存在时；带 `--skip-duplicate`，重复版本不报错）
+5. **Open VSX 发布**（仅 `OVSX_PAT` 存在时；shell 级检测 "already published" → warning 跳过）
+6. **GitHub Release** — `if: always()` 始终执行，挂上 `.vsix` 文件 + 自动生成的 commit 列表
 
 ### 验证发布结果
 
@@ -153,6 +153,10 @@ ovsx publish *.vsix --pat "$OVSX_PAT"
 
 ### Open VSX 503 backend write error
 他们 CDN/后端偶尔抖动，直接重跑 release workflow（Actions 页 → Re-run failed jobs）或本地 `ovsx publish` 重试即可。
+
+### 已经发过同版本号怎么办
+- **CI 中触发**：release workflow 对 Marketplace 用 `--skip-duplicate`、对 Open VSX 做 shell 级 `already published` 检测，**会自动跳过并 warning**，不阻塞 GitHub Release 步骤
+- **本地手动触发**：删本地 / 远端 tag，bump 版本号到下一个 patch，重走标准流程；不可在同一版本号上"覆盖"发布
 
 ### Tag 与 package.json 版本不一致
 release workflow 第一步会拦截。本地修复：
