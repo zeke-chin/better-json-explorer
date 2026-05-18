@@ -11,7 +11,7 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 ### 1. 智能识别与格式化
 ![Auto Paste Format](images/auto-paste-format.gif)
 
-### 2. JSON 格式一键切换 (Cmd+;)
+### 2. JSON 格式一键切换（默认 Cmd+;）
 ![Toggle Format](images/json-string-toggle.gif)
 
 ### 3. 任意字符串 Hover 预览与嵌套解析
@@ -20,7 +20,7 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 ## 功能
 
 1. **智能识别与格式化**：新建文件时，粘贴内容若为合法 JSON 或 JSON 字符串，自动切换语言模式为 JSON 并格式化
-2. **JSON 格式切换**：JSON/JSONC 文件中使用 `Cmd+;`（Windows/Linux 为 `Ctrl+;`）在 JSON 格式和 JSON 字符串之间切换
+2. **JSON 格式切换**：JSON/JSONC 文件中使用默认快捷键 `Cmd+;`（Windows/Linux 为 `Ctrl+;`）在 JSON 格式和 JSON 字符串之间切换
 3. **任意字符串值的 Hover 预览**：JSON 中所有 string 值都支持鼠标悬停预览，并按内容智能选择渲染方式
    - **嵌套 JSON**（如 `"{\"a\":1}"`）→ 展开为格式化 JSON 渲染
    - **Markdown 文本**（标题/列表/代码围栏/链接/表格等）→ 直接以 markdown 渲染
@@ -31,6 +31,22 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
      - 纯文本 → `Value-<keyPath>.txt`
    - 多次点击会在右侧同一分栏增加 Tab，互不覆盖；新文档本身也是 JSON / Markdown 文档，因此**递归支持任意深度嵌套**
 4. **嵌套 JSON 字符串 CodeLens**：可解析为 JSON 对象/数组的字符串值上方会显示 `▸ Parse JSON` 行内按钮，等价于 Hover 链接的快捷入口（纯文本/markdown 不会显示 CodeLens，避免噪音）
+
+## 快捷键
+
+- 默认快捷键：macOS `Cmd+;`，Windows/Linux `Ctrl+;`
+- 如需修改，请使用 VS Code 自带的 **Keyboard Shortcuts**，搜索命令 `BetterJsonExplorer: Toggle Current Document JSON Format/String`
+- 对应的 command ID 是 `better-json-explorer.toggleCurrentDocument`
+
+如果想直接在 `keybindings.json` 中重绑，可以添加类似配置：
+
+```json
+{
+  "key": "cmd+alt+j",
+  "command": "better-json-explorer.toggleCurrentDocument",
+  "when": "editorTextFocus && (editorLangId == json || editorLangId == jsonc)"
+}
+```
 
 ## 示例
 
