@@ -89,5 +89,5 @@ jobs:
 
             Install:
             - VS Code: search **better-json-explorer** in the Extensions panel
-            - VSCodium / Cursor / Code-OSS: install from [Open VSX](https://open-vsx.org/extension/zeke-chin/better-json-explorer)
+            - VSCodium / Cursor / Code-OSS: install from [Open VSX](https://open-vsx.org/extension/zekeChin/better-json-explorer)
             - Manual: download the `.vsix` attached below and run `code --install-extension <file>.vsix`

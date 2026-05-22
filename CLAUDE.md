@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-BetterJsonExplorer — VS Code 扩展，提供更好的 JSON 预览与编辑体验。已发布到 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=zeke-chin.better-json-explorer) 与 [Open VSX](https://open-vsx.org/extension/zeke-chin/better-json-explorer)。
+BetterJsonExplorer — VS Code 扩展，提供更好的 JSON 预览与编辑体验。已发布到 [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=zekeChin.better-json-explorer) 与 [Open VSX](https://open-vsx.org/extension/zekeChin/better-json-explorer)。
 
 ## 常用命令
 

@@ -9,3 +9,4 @@ node_modules
 video_draft
 
 .env
+.claude-trace

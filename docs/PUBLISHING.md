@@ -11,7 +11,7 @@
 #### a. 微软账号 + Publisher
 1. 任意邮箱注册微软账号：https://login.microsoftonline.com
 2. 打开 [Marketplace 管理后台](https://marketplace.visualstudio.com/manage) → `Create publisher`
-3. **Publisher ID 必须是 `zeke-chin`**（与 `package.json` 字段一致，首次发布后不可更改）
+3. **Publisher ID 必须是 `zekeChin`**（与 `package.json` 字段一致，首次发布后不可更改）
 
 #### b. Azure DevOps PAT
 1. 用同一个微软账号登录 https://dev.azure.com（首次会要求创建 organization，名字随意）
@@ -37,8 +37,8 @@
 
 ```bash
 export OVSX_PAT=<你的 token>
-npx ovsx create-namespace zeke-chin
-# 输出：🚀 Created namespace zeke-chin
+npx ovsx create-namespace zekeChin
+# 输出：🚀 Created namespace zekeChin
 ```
 
 ---
@@ -91,8 +91,8 @@ git push origin main --follow-tags
 
 ### 验证发布结果
 
-- Marketplace：https://marketplace.visualstudio.com/items?itemName=zeke-chin.better-json-explorer （5-15 分钟审核）
-- Open VSX：https://open-vsx.org/extension/zeke-chin/better-json-explorer （1-2 分钟 CDN 刷新）
+- Marketplace：https://marketplace.visualstudio.com/items?itemName=zekeChin.better-json-explorer （5-15 分钟审核）
+- Open VSX：https://open-vsx.org/extension/zekeChin/better-json-explorer （1-2 分钟 CDN 刷新）
 - GitHub Release：https://github.com/zeke-chin/better-json-explorer/releases
 
 ---
