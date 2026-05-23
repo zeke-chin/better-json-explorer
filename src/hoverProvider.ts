@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
 import { detectStringFormat, findStringValues, StringValueHit } from './jsonUtils';
-import { PARSE_COMMAND_ID } from './codeLensProvider';
-
-export type OpenKind = 'json' | 'text' | 'markdown';
+import { OpenKind, PARSE_COMMAND_ID } from './codeLensProvider';
 
 export class NestedJsonHoverProvider implements vscode.HoverProvider {
 	provideHover(
@@ -19,9 +17,12 @@ export class NestedJsonHoverProvider implements vscode.HoverProvider {
 		md.isTrusted = { enabledCommands: [PARSE_COMMAND_ID] };
 
 		if (hit.parsedText !== undefined) {
-			md.appendMarkdown(`**Parsed JSON** \`${escapeMarkdown(hit.keyPath)}\`\n\n`);
+			const isPython = hit.sourceKind === 'python';
+			const sourceLabel = isPython ? 'Parsed Python dict' : 'Parsed JSON';
+			const kind: OpenKind = isPython ? 'python' : 'json';
+			md.appendMarkdown(`**${sourceLabel}** \`${escapeMarkdown(hit.keyPath)}\`\n\n`);
 			md.appendCodeblock(hit.parsedText, 'json');
-			md.appendMarkdown(`\n\n${buildOpenLink(hit.parsedText, hit.keyPath, 'json')}`);
+			md.appendMarkdown(`\n\n${buildOpenLink(hit.parsedText, hit.keyPath, kind)}`);
 			return new vscode.Hover(md, hit.range);
 		}
 
@@ -48,6 +49,7 @@ function buildOpenLink(content: string, keyPath: string, kind: OpenKind): string
 	const args = encodeURIComponent(JSON.stringify([content, keyPath, kind]));
 	const label =
 		kind === 'json' ? '▸ Open parsed JSON in side panel'
+		: kind === 'python' ? '▸ Open parsed Python dict in side panel'
 		: kind === 'markdown' ? '▸ Open markdown in side panel'
 		: '▸ Open value in side panel';
 	return `[${label}](command:${PARSE_COMMAND_ID}?${args})`;

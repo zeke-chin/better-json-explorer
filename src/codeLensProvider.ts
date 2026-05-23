@@ -21,9 +21,9 @@ export class NestedJsonCodeLensProvider implements vscode.CodeLensProvider {
 		const lenses = hits.map(
 			(hit) =>
 				new vscode.CodeLens(new vscode.Range(hit.range.start, hit.range.start), {
-					title: '▸ Parse JSON',
+					title: hit.sourceKind === 'python' ? '▸ Parse Python dict' : '▸ Parse JSON',
 					command: PARSE_COMMAND_ID,
-					arguments: [hit.parsedText, hit.keyPath],
+					arguments: [hit.parsedText, hit.keyPath, hit.sourceKind === 'python' ? 'python' : 'json'],
 				})
 		);
 
@@ -32,12 +32,13 @@ export class NestedJsonCodeLensProvider implements vscode.CodeLensProvider {
 	}
 }
 
-export type OpenKind = 'json' | 'text' | 'markdown';
+export type OpenKind = 'json' | 'text' | 'markdown' | 'python';
 
 const OPEN_KIND_CONFIG: Record<OpenKind, { prefix: string; ext: string; language: string }> = {
 	json: { prefix: 'Parsed', ext: 'json', language: 'json' },
 	text: { prefix: 'Value', ext: 'txt', language: 'plaintext' },
 	markdown: { prefix: 'Value', ext: 'md', language: 'markdown' },
+	python: { prefix: 'Parsed-py', ext: 'json', language: 'json' },
 };
 
 export async function parseNestedJsonCommand(

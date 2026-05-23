@@ -19,18 +19,30 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 
 ## 功能
 
-1. **智能识别与格式化**：新建文件时，粘贴内容若为合法 JSON 或 JSON 字符串，自动切换语言模式为 JSON 并格式化
+1. **智能识别与格式化**：新建文件时，粘贴内容若为合法 JSON、JSON 字符串，或 Python `repr(dict)` 字面量，自动切换语言模式为 JSON 并格式化
 2. **JSON 格式切换**：JSON/JSONC 文件中使用默认快捷键 `Cmd+;`（Windows/Linux 为 `Ctrl+;`）在 JSON 格式和 JSON 字符串之间切换
 3. **任意字符串值的 Hover 预览**：JSON 中所有 string 值都支持鼠标悬停预览，并按内容智能选择渲染方式
    - **嵌套 JSON**（如 `"{\"a\":1}"`）→ 展开为格式化 JSON 渲染
+   - **Python dict 字符串**（如 `"{'a': 1, 'ok': True}"`）→ 转为 JSON 后展开渲染，Hover 标题为 "Parsed Python dict"
    - **Markdown 文本**（标题/列表/代码围栏/链接/表格等）→ 直接以 markdown 渲染
    - **纯文本/代码** → code block 等宽显示，转义字符（`\n`/`\t`）按真实换行/制表展示
    - Hover 浮窗底部带 `▸ Open ... in side panel` 链接，点击在右侧分栏新开 untitled 文档：
      - 嵌套 JSON → `Parsed-<keyPath>.json`
+     - Python dict → `Parsed-py-<keyPath>.json`
      - Markdown → `Value-<keyPath>.md`（可用 `Cmd+Shift+V` 触发 markdown 预览）
      - 纯文本 → `Value-<keyPath>.txt`
    - 多次点击会在右侧同一分栏增加 Tab，互不覆盖；新文档本身也是 JSON / Markdown 文档，因此**递归支持任意深度嵌套**
-4. **嵌套 JSON 字符串 CodeLens**：可解析为 JSON 对象/数组的字符串值上方会显示 `▸ Parse JSON` 行内按钮，等价于 Hover 链接的快捷入口（纯文本/markdown 不会显示 CodeLens，避免噪音）
+4. **嵌套 JSON 字符串 CodeLens**：可解析为 JSON 对象/数组的字符串值上方会显示 `▸ Parse JSON`（或 `▸ Parse Python dict`）行内按钮，等价于 Hover 链接的快捷入口（纯文本/markdown 不会显示 CodeLens，避免噪音）
+
+### Python dict 支持范围
+
+支持 `ast.literal_eval` 的子集：`dict` / `list` / `tuple`（转为数组） / `str`（单/双/三引号） / `int` / `float` / `True` / `False` / `None`。下列**不支持**，输入会被原样保留（不会误转、不会报错）：
+
+- 含函数调用（如 `datetime(2024, 1, 1)`、`UUID('...')`、`Decimal('1.5')`）
+- 含对象引用（如 `<Foo object at 0x100>`）
+- bytes 字面量（`b'...'`）
+- set 字面量（`{1, 2, 3}` 无键值对形式）
+- 非字符串 key 的 dict（如 `{1: 'a'}`，因 JSON 仅支持字符串 key）
 
 ## 快捷键
 
