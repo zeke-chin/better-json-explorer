@@ -1,13 +1,13 @@
 import * as vscode from 'vscode';
 import { Node, parseTree } from 'jsonc-parser';
-import { pythonReprToJson } from './pythonRepr';
-import { escapeQuotedLineBreaks } from './textNormalize';
+import { pythonReprToJson } from './inputRepair/pythonRepr';
+import { escapeQuotedLineBreaks } from './inputRepair/quotedLineBreaks';
 
 export type SourceKind = 'json' | 'python';
 
 export type JsonFormatResult = {
 	formatted: string;
-	sourceKind: 'json' | 'json_str' | 'python_str';
+	sourceKind: 'json' | 'json_str' | 'json_repaired' | 'python_str';
 };
 
 export type NestedJsonHit = {
@@ -123,6 +123,7 @@ export function formatJsonOrJsonString(text: string): JsonFormatResult | undefin
 	// Newlines inside a quoted literal become \n escapes; newlines outside
 	// strings (valid whitespace) are preserved untouched.
 	const repaired = escapeQuotedLineBreaks(trimmed);
+	const wasRepaired = repaired !== trimmed;
 
 	let candidate = repaired;
 	let parsedFromString = false;
@@ -137,9 +138,13 @@ export function formatJsonOrJsonString(text: string): JsonFormatResult | undefin
 		}
 
 		if (isJsonContainer(parsed)) {
+			const baseKind = parsedFromString ? 'json_str' : 'json';
 			return {
 				formatted: JSON.stringify(parsed, null, '\t'),
-				sourceKind: parsedFromString ? 'json_str' : 'json',
+				// `wasRepaired` only escalates the kind for top-level JSON.
+				// Once a string-unwrap layer is involved (`json_str`), the
+				// repair signal is no longer crisp — leave it as `json_str`.
+				sourceKind: baseKind === 'json' && wasRepaired ? 'json_repaired' : baseKind,
 			};
 		}
 
@@ -299,46 +304,4 @@ export function formatKeyPath(path: Array<string | number>): string {
 		}
 	}
 	return result;
-}
-
-export type PlainStringFormat = 'markdown' | 'text';
-
-const MARKDOWN_MIN_LENGTH = 20;
-const MARKDOWN_MIN_SCORE = 2;
-
-const STRONG_MARKDOWN_PATTERNS: RegExp[] = [
-	/```[\s\S]*?```/,                                  // fenced code block
-	/!\[[^\]]*\]\([^)\s]+\)/,                          // image
-	/^\|.+\|\s*\r?\n\|[\s:|-]+\|/m,                    // table header + separator
-];
-
-const WEAK_MARKDOWN_PATTERNS: RegExp[] = [
-	/^#{1,6}\s+\S/m,                                   // ATX heading
-	/\[[^\]\n]+\]\([^)\s]+\)/,                         // inline link
-	/^>\s+\S/m,                                        // blockquote
-	/^---+$/m,                                         // horizontal rule
-	/\*\*[^*\n]+\*\*/,                                 // bold
-	/(?<!\w)__[^_\n]+__(?!\w)/,                        // bold (underscore)
-	/^[-*+]\s+\S.*(?:\r?\n[-*+]\s+\S.*){1,}/m,         // multi-item bullet list
-	/^\d+\.\s+\S.*(?:\r?\n\d+\.\s+\S.*){1,}/m,         // multi-item ordered list
-];
-
-export function detectStringFormat(value: string): PlainStringFormat {
-	if (value.length < MARKDOWN_MIN_LENGTH) {
-		return 'text';
-	}
-
-	let score = 0;
-	for (const re of STRONG_MARKDOWN_PATTERNS) {
-		if (re.test(value)) {
-			score += 2;
-		}
-	}
-	for (const re of WEAK_MARKDOWN_PATTERNS) {
-		if (re.test(value)) {
-			score += 1;
-		}
-	}
-
-	return score >= MARKDOWN_MIN_SCORE ? 'markdown' : 'text';
 }

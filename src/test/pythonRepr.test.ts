@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { pythonReprToJson } from '../pythonRepr';
+import { pythonReprToJson } from '../inputRepair/pythonRepr';
 
 function expectJson(input: string, expected: unknown): void {
 	const result = pythonReprToJson(input);

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { escapeQuotedLineBreaks } from '../textNormalize';
+import { escapeQuotedLineBreaks } from '../inputRepair/quotedLineBreaks';
 
 suite('escapeQuotedLineBreaks', () => {
 	test('returns input unchanged when no line breaks present (fast path)', () => {

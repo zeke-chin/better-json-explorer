@@ -19,9 +19,17 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 
 ## 功能
 
-1. **智能识别与格式化**：新建文件时，粘贴内容若为合法 JSON、JSON 字符串，或 Python `repr(dict)` 字面量，自动切换语言模式为 JSON 并格式化
-   - **抗终端折行**：粘贴源自控制台、日志聚合工具等场景时，字符串值内部可能被宽度限制截断带入真实换行（JSON.parse 原本会报 `Bad control character in string literal`），扩展会先修复这类输入再走解析
-2. **JSON 格式切换**：JSON/JSONC 文件中使用默认快捷键 `Cmd+;`（Windows/Linux 为 `Ctrl+;`）在 JSON 格式和 JSON 字符串之间切换
+1. **智能识别与格式化**：在 plaintext 文件粘贴时，扩展会按内容分三类处理：
+
+   | 内容类型 | 默认行为 | 可通过设置改成"粘贴即转" |
+   |---|---|---|
+   | 合法 JSON 或 JSON 字符串 | **自动**切换语言模式并格式化 | — |
+   | Python `repr(dict)` 字面量（单引号/`True/False/None`/tuple 等） | 顶部显示按钮 **`▸ Convert Python dict to JSON`**，点击或按 `Cmd+;` 转换 | ✓ |
+   | 含字符串内真换行的 JSON（终端/日志聚合工具复制场景，JSON.parse 会报 `Bad control character in string literal`） | 顶部显示按钮 **`▸ Convert to JSON (fix line breaks)`**，点击或按 `Cmd+;` 修复并转换 | ✓ |
+
+   后两类默认走"显示按钮 → 用户确认"模式，避免静默改写可能是真实 Python 源码 / 待检查内容的输入；用户可以通过配置改成"粘贴即转"。
+
+2. **JSON 格式切换**：JSON/JSONC 文件中使用默认快捷键 `Cmd+;`（Windows/Linux 为 `Ctrl+;`）在 JSON 格式和 JSON 字符串之间切换；在 plaintext 文件中（当顶部转换按钮可见时）该快捷键等价于点击按钮，转换后语言模式切到 JSON，再按一次即进入上述 toggle 链路
 3. **任意字符串值的 Hover 预览**：JSON 中所有 string 值都支持鼠标悬停预览，并按内容智能选择渲染方式
    - **嵌套 JSON**（如 `"{\"a\":1}"`）→ 展开为格式化 JSON 渲染
    - **Python dict 字符串**（如 `"{'a': 1, 'ok': True}"`）→ 转为 JSON 后展开渲染，Hover 标题为 "Parsed Python dict"
@@ -45,9 +53,31 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 - set 字面量（`{1, 2, 3}` 无键值对形式）
 - 非字符串 key 的 dict（如 `{1: 'a'}`，因 JSON 仅支持字符串 key）
 
+## 设置
+
+在 VS Code 中打开 **Settings**（`Cmd+,` / `Ctrl+,`），搜索 `betterJsonExplorer` 可看到两项开关：
+
+| 配置项 | 默认 | 含义 |
+|---|---|---|
+| `betterJsonExplorer.pythonRepr.autoConvert` | `false`（显示按钮） | `true` 时粘贴 Python repr 即转 JSON，不再显示 `▸ Convert Python dict to JSON` 按钮 |
+| `betterJsonExplorer.lineBreakRepair.autoConvert` | `false`（显示按钮） | `true` 时粘贴含字符串内真换行的 JSON 即修复并转 JSON，不再显示 `▸ Convert to JSON (fix line breaks)` 按钮 |
+
+也可以直接编辑 `settings.json`：
+
+```json
+{
+  "betterJsonExplorer.pythonRepr.autoConvert": true,
+  "betterJsonExplorer.lineBreakRepair.autoConvert": true
+}
+```
+
+配置变化即时生效，无需重启。
+
 ## 快捷键
 
 - 默认快捷键：macOS `Cmd+;`，Windows/Linux `Ctrl+;`
+- 在 **JSON/JSONC 文件**中：JSON ⇄ JSON 字符串 切换
+- 在 **plaintext 文件**中（当顶部转换按钮可见时）：等价于点击按钮，转换为 JSON 并切换语言模式；按钮不可见时（普通文本、干净 JSON、或已通过配置改成"粘贴即转"）状态栏提示 `nothing to convert`，不做事
 - 如需修改，请使用 VS Code 自带的 **Keyboard Shortcuts**，搜索命令 `BetterJsonExplorer: Toggle Current Document JSON Format/String`
 - 对应的 command ID 是 `better-json-explorer.toggleCurrentDocument`
 
@@ -57,7 +87,7 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 {
   "key": "cmd+alt+j",
   "command": "better-json-explorer.toggleCurrentDocument",
-  "when": "editorTextFocus && (editorLangId == json || editorLangId == jsonc)"
+  "when": "editorTextFocus && (editorLangId == json || editorLangId == jsonc || editorLangId == plaintext)"
 }
 ```
 

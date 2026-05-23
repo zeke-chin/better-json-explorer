@@ -3,7 +3,7 @@
   "displayName": "BetterJsonExplorer",
   "description": "智能 JSON 体验：粘贴自动识别、JSON ⇄ 字符串切换、嵌套 JSON 字符串解析、字符串值 Hover 预览（JSON / Markdown / 纯文本）。",
   "icon": "images/icon.png",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "zekeChin",
   "license": "MIT",
   "author": {
@@ -50,6 +50,10 @@
       {
         "command": "better-json-explorer.parseNestedJson",
         "title": "BetterJsonExplorer: Parse Nested JSON String"
+      },
+      {
+        "command": "better-json-explorer.convertToJsonInPlace",
+        "title": "BetterJsonExplorer: Convert active document to JSON (Python dict or line-break repair)"
       }
     ],
     "keybindings": [
@@ -57,9 +61,24 @@
         "command": "better-json-explorer.toggleCurrentDocument",
         "key": "ctrl+;",
         "mac": "cmd+;",
-        "when": "editorTextFocus && (editorLangId == json || editorLangId == jsonc)"
+        "when": "editorTextFocus && (editorLangId == json || editorLangId == jsonc || editorLangId == plaintext)"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "BetterJsonExplorer",
+      "properties": {
+        "betterJsonExplorer.pythonRepr.autoConvert": {
+          "type": "boolean",
+          "default": false,
+          "description": "粘贴 Python repr 字典内容时是否直接转换为 JSON。默认 false：在顶部显示 ▸ Convert 按钮，点击后才转换。设为 true 时粘贴即转换，且不再显示按钮。"
+        },
+        "betterJsonExplorer.lineBreakRepair.autoConvert": {
+          "type": "boolean",
+          "default": false,
+          "description": "粘贴包含字符串内真换行（如从终端复制的 JSON）时是否直接修复并转换为 JSON。默认 false：在顶部显示 ▸ Convert 按钮，点击后才转换。设为 true 时粘贴即转换，且不再显示按钮。"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "yarn run compile",

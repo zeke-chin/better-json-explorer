@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { detectStringFormat, findStringValues, StringValueHit } from './jsonUtils';
-import { OpenKind, PARSE_COMMAND_ID } from './codeLensProvider';
+import { findStringValues, StringValueHit } from './jsonUtils';
+import { detectStringFormat } from './markdownDetect';
+import { OpenKind, PARSE_COMMAND_ID } from './parseNestedCommand';
 
 export class NestedJsonHoverProvider implements vscode.HoverProvider {
 	provideHover(
