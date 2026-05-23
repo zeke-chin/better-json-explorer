@@ -150,6 +150,31 @@ suite('jsonUtils', () => {
 			assert.ok(result);
 			assert.ok(result.formatted.includes('\n'), 'expected pretty-printed multi-line output');
 		});
+
+		test('repairs JSON whose string values were wrapped mid-line in a terminal', () => {
+			// Real-world paste from a console that broke a string literal
+			// across lines. JSON.parse alone would reject this with "Bad
+			// control character in string literal".
+			const input = `{"request_id":"req-001","session":"{'token': 'abc123', 'expires_in': 3600,
+  'roles':
+    ['admin', 'user']}"}`;
+			const result = formatJsonOrJsonString(input);
+			assert.ok(result, 'expected the line-wrapped JSON to be repaired');
+			assert.strictEqual(result.sourceKind, 'json');
+			const parsed = JSON.parse(result.formatted);
+			assert.strictEqual(parsed.request_id, 'req-001');
+			// The session value still contains the inner Python repr text
+			// verbatim (with real newlines now embedded as JS string newlines).
+			assert.ok(parsed.session.startsWith("{'token': 'abc123'"));
+		});
+
+		test('repairs Python repr whose strings were wrapped mid-line in a terminal', () => {
+			const input = "{'a': 'line1\nline2', 'b': 2}";
+			const result = formatJsonOrJsonString(input);
+			assert.ok(result);
+			assert.strictEqual(result.sourceKind, 'python_str');
+			assert.deepStrictEqual(JSON.parse(result.formatted), { a: 'line1\nline2', b: 2 });
+		});
 	});
 
 	suite('stringifyJsonText', () => {

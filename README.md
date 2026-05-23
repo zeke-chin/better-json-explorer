@@ -20,6 +20,7 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
 ## 功能
 
 1. **智能识别与格式化**：新建文件时，粘贴内容若为合法 JSON、JSON 字符串，或 Python `repr(dict)` 字面量，自动切换语言模式为 JSON 并格式化
+   - **抗终端折行**：粘贴源自控制台、日志聚合工具等场景时，字符串值内部可能被宽度限制截断带入真实换行（JSON.parse 原本会报 `Bad control character in string literal`），扩展会先修复这类输入再走解析
 2. **JSON 格式切换**：JSON/JSONC 文件中使用默认快捷键 `Cmd+;`（Windows/Linux 为 `Ctrl+;`）在 JSON 格式和 JSON 字符串之间切换
 3. **任意字符串值的 Hover 预览**：JSON 中所有 string 值都支持鼠标悬停预览，并按内容智能选择渲染方式
    - **嵌套 JSON**（如 `"{\"a\":1}"`）→ 展开为格式化 JSON 渲染

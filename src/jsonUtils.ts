@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { Node, parseTree } from 'jsonc-parser';
 import { pythonReprToJson } from './pythonRepr';
+import { escapeQuotedLineBreaks } from './textNormalize';
 
 export type SourceKind = 'json' | 'python';
 
@@ -118,7 +119,12 @@ export function formatJsonOrJsonString(text: string): JsonFormatResult | undefin
 		return undefined;
 	}
 
-	let candidate = trimmed;
+	// Repair input copied from a terminal that broke lines mid-string.
+	// Newlines inside a quoted literal become \n escapes; newlines outside
+	// strings (valid whitespace) are preserved untouched.
+	const repaired = escapeQuotedLineBreaks(trimmed);
+
+	let candidate = repaired;
 	let parsedFromString = false;
 
 	for (let depth = 0; depth < UNWRAP_DEPTH; depth++) {
@@ -149,10 +155,10 @@ export function formatJsonOrJsonString(text: string): JsonFormatResult | undefin
 		parsedFromString = true;
 	}
 
-	// Python repr fallback. We always probe against the original trimmed
-	// input rather than `candidate`, because Python repr only makes sense at
-	// the top level — we don't try to unwrap it from string-wrapped layers.
-	const pyResult = pythonReprToJson(trimmed);
+	// Python repr fallback. We always probe against the repaired input
+	// rather than `candidate`, because Python repr only makes sense at the
+	// top level — we don't try to unwrap it from string-wrapped layers.
+	const pyResult = pythonReprToJson(repaired);
 	if (pyResult) {
 		try {
 			const parsed: unknown = JSON.parse(pyResult.json);
