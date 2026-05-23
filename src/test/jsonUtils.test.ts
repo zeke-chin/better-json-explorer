@@ -8,6 +8,7 @@ import {
 	isJsonContainer,
 	stringifyJsonText,
 	tryUnwrapJsonString,
+	tryUnwrapStructured,
 } from '../jsonUtils';
 
 suite('jsonUtils', () => {
@@ -66,6 +67,51 @@ suite('jsonUtils', () => {
 			}
 			assert.strictEqual(tryUnwrapJsonString(value), undefined);
 		});
+
+		test('does not accept Python repr (JSON-only boundary preserved)', () => {
+			// Python fallback lives in tryUnwrapStructured, not here.
+			assert.strictEqual(tryUnwrapJsonString("{'a': 1}"), undefined);
+		});
+	});
+
+	suite('tryUnwrapStructured', () => {
+		test('unwraps plain JSON with sourceKind json', () => {
+			const result = tryUnwrapStructured('{"a":1}');
+			assert.ok(result);
+			assert.deepStrictEqual(result.value, { a: 1 });
+			assert.strictEqual(result.sourceKind, 'json');
+		});
+
+		test('unwraps multi-level JSON string with sourceKind json', () => {
+			const result = tryUnwrapStructured(JSON.stringify(JSON.stringify({ a: 1 })));
+			assert.ok(result);
+			assert.deepStrictEqual(result.value, { a: 1 });
+			assert.strictEqual(result.sourceKind, 'json');
+		});
+
+		test('unwraps Python repr with sourceKind python', () => {
+			const result = tryUnwrapStructured("{'a': 1, 'b': True, 'c': None}");
+			assert.ok(result);
+			assert.deepStrictEqual(result.value, { a: 1, b: true, c: null });
+			assert.strictEqual(result.sourceKind, 'python');
+		});
+
+		test('unwraps Python list with sourceKind python', () => {
+			const result = tryUnwrapStructured("[1, 'a', True]");
+			assert.ok(result);
+			assert.deepStrictEqual(result.value, [1, 'a', true]);
+			assert.strictEqual(result.sourceKind, 'python');
+		});
+
+		test('returns undefined for non-container Python literal', () => {
+			assert.strictEqual(tryUnwrapStructured('True'), undefined);
+			assert.strictEqual(tryUnwrapStructured("'hello'"), undefined);
+		});
+
+		test('returns undefined for unparseable input', () => {
+			assert.strictEqual(tryUnwrapStructured('not anything'), undefined);
+			assert.strictEqual(tryUnwrapStructured(''), undefined);
+		});
 	});
 
 	suite('formatJsonOrJsonString', () => {
@@ -90,6 +136,44 @@ suite('jsonUtils', () => {
 		test('returns undefined for invalid input', () => {
 			assert.strictEqual(formatJsonOrJsonString('not json'), undefined);
 			assert.strictEqual(formatJsonOrJsonString(''), undefined);
+		});
+
+		test('detects Python repr source at the top level', () => {
+			const result = formatJsonOrJsonString("{'a': 1, 'b': True}");
+			assert.ok(result);
+			assert.strictEqual(result.sourceKind, 'python_str');
+			assert.deepStrictEqual(JSON.parse(result.formatted), { a: 1, b: true });
+		});
+
+		test('formatted Python output is pretty-printed JSON', () => {
+			const result = formatJsonOrJsonString("{'a': 1}");
+			assert.ok(result);
+			assert.ok(result.formatted.includes('\n'), 'expected pretty-printed multi-line output');
+		});
+
+		test('repairs JSON whose string values were wrapped mid-line in a terminal', () => {
+			// Real-world paste from a console that broke a string literal
+			// across lines. JSON.parse alone would reject this with "Bad
+			// control character in string literal".
+			const input = `{"request_id":"req-001","session":"{'token': 'abc123', 'expires_in': 3600,
+  'roles':
+    ['admin', 'user']}"}`;
+			const result = formatJsonOrJsonString(input);
+			assert.ok(result, 'expected the line-wrapped JSON to be repaired');
+			assert.strictEqual(result.sourceKind, 'json');
+			const parsed = JSON.parse(result.formatted);
+			assert.strictEqual(parsed.request_id, 'req-001');
+			// The session value still contains the inner Python repr text
+			// verbatim (with real newlines now embedded as JS string newlines).
+			assert.ok(parsed.session.startsWith("{'token': 'abc123'"));
+		});
+
+		test('repairs Python repr whose strings were wrapped mid-line in a terminal', () => {
+			const input = "{'a': 'line1\nline2', 'b': 2}";
+			const result = formatJsonOrJsonString(input);
+			assert.ok(result);
+			assert.strictEqual(result.sourceKind, 'python_str');
+			assert.deepStrictEqual(JSON.parse(result.formatted), { a: 'line1\nline2', b: 2 });
 		});
 	});
 
@@ -233,6 +317,32 @@ suite('jsonUtils', () => {
 			const hits = findStringValuesRaw(text);
 			assert.strictEqual(hits.length, 3);
 			assert.deepStrictEqual(hits.map((h) => h.keyPath), ['tags[0]', 'tags[1]', 'tags[2]']);
+		});
+
+		test('propagates sourceKind json on JSON-parseable string', () => {
+			const inner = JSON.stringify(JSON.stringify({ a: 1 }));
+			const text = `{"data":${inner}}`;
+			const hits = findStringValuesRaw(text);
+			assert.strictEqual(hits.length, 1);
+			assert.strictEqual(hits[0].sourceKind, 'json');
+			assert.ok(hits[0].parsedText);
+		});
+
+		test('propagates sourceKind python on Python repr string value', () => {
+			const text = `{"log":"{'user':'alice','ok':True}"}`;
+			const hits = findStringValuesRaw(text);
+			assert.strictEqual(hits.length, 1);
+			assert.strictEqual(hits[0].sourceKind, 'python');
+			assert.ok(hits[0].parsedText);
+			assert.deepStrictEqual(JSON.parse(hits[0].parsedText!), { user: 'alice', ok: true });
+		});
+
+		test('defaults sourceKind to json when no unwrap happened', () => {
+			const text = `{"plain":"just a string"}`;
+			const hits = findStringValuesRaw(text);
+			assert.strictEqual(hits.length, 1);
+			assert.strictEqual(hits[0].parsedText, undefined);
+			assert.strictEqual(hits[0].sourceKind, 'json');
 		});
 	});
 

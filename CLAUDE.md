@@ -21,26 +21,34 @@ yarn package          # vsce 本地打包出 .vsix
 
 ## 架构
 
-源码拆分为 5 个职责清晰的模块，避免 `extension.ts` 膨胀：
+源码拆分为 7 个职责清晰的模块，避免 `extension.ts` 膨胀：
 
 | 文件 | 职责 |
 |---|---|
 | `src/extension.ts` | 仅 `activate`/`deactivate`、provider/command 注册、`onDidChangeTextDocument` 粘贴热路径、`Cmd+;` toggle |
-| `src/jsonUtils.ts` | 纯函数：`formatJsonOrJsonString` / `stringifyJsonText` / `tryUnwrapJsonString` / `findStringValues` / `findNestedJsonStrings` / `detectStringFormat`（Markdown 启发式打分） |
-| `src/hoverProvider.ts` | `NestedJsonHoverProvider`：覆盖所有 string value，按内容分类渲染 JSON / Markdown / 纯文本，Hover 浮窗内嵌 command URI 触发 parse |
-| `src/codeLensProvider.ts` | `NestedJsonCodeLensProvider`（仅 JSON 可解析字符串显示 `▸ Parse JSON`）+ `parseNestedJsonCommand`（按 `kind` 决定 `.json`/`.md`/`.txt` + `Parsed-`/`Value-` 前缀，`ViewColumn.Beside` + `preview:false` 在右侧多 Tab 打开） |
+| `src/jsonUtils.ts` | 纯函数：`formatJsonOrJsonString` / `stringifyJsonText` / `tryUnwrapJsonString`（JSON-only）/ `tryUnwrapStructured`（JSON 失败时兜底走 Python，返回 `sourceKind: 'json' \| 'python'`）/ `findStringValues` / `findNestedJsonStrings` / `detectStringFormat`（Markdown 启发式打分） |
+| `src/pythonRepr.ts` | 纯函数 `pythonReprToJson(input)`：手写递归下降解析器，把 Python `repr(dict)` 字面量转为合法 JSON 文本。覆盖 `ast.literal_eval` 子集（dict/list/tuple/str/num/bool/None），遇到函数调用 / 对象 repr / bytes / set literal 整体放弃 |
+| `src/textNormalize.ts` | 纯函数 `escapeQuotedLineBreaks(input)`：单趟扫描修复"字符串字面量内部含真换行"的输入（终端宽度折行造成）。识别 `"..."` 与 `'...'` 两类引号、honors `\\` 转义、CRLF 算单换行。string 外的换行原样保留。fast path：无换行直接返回 |
+| `src/hoverProvider.ts` | `NestedJsonHoverProvider`：覆盖所有 string value，按内容分类渲染 JSON / Markdown / 纯文本，Hover 浮窗内嵌 command URI 触发 parse。根据 `hit.sourceKind` 区分显示 "Parsed JSON" 还是 "Parsed Python dict" |
+| `src/codeLensProvider.ts` | `NestedJsonCodeLensProvider`（按 `sourceKind` 显示 `▸ Parse JSON` 或 `▸ Parse Python dict`）+ `parseNestedJsonCommand`（按 `kind` 决定 `.json`/`.md`/`.txt` + `Parsed-`/`Value-`/`Parsed-py-` 前缀，`ViewColumn.Beside` + `preview:false` 在右侧多 Tab 打开） |
 | `src/logger.ts` | OutputChannel 包装，全模块共用 |
 
 ### 数据流
 
 1. `parseTree` (jsonc-parser) → AST
-2. `walkAllStrings` 遍历 AST，对每个 string value 调 `tryUnwrapJsonString` 做最多 4 层 unwrap
-3. `findStringValuesRaw` 返回 `{offset, length, keyPath, rawValue, parsedText?}`，Hover/CodeLens 在此基础上叠加 `vscode.Range`
-4. `keyPath` 形如 `data.items[2].config`，用于命名右侧打开的 untitled 文档
+2. `walkAllStrings` 遍历 AST，对每个 string value 调 `tryUnwrapStructured`：先 JSON 多层 unwrap（最多 4 层），失败再尝试 Python repr → JSON 转换；命中时附带 `sourceKind` 标识
+3. `findStringValuesRaw` 返回 `{offset, length, keyPath, rawValue, parsedText?, sourceKind}`，Hover/CodeLens 在此基础上叠加 `vscode.Range` 并按 `sourceKind` 分支文案
+4. `keyPath` 形如 `data.items[2].config`，用于命名右侧打开的 untitled 文档（Python 来源命名为 `Parsed-py-{keyPath}.json`）
+
+**顶层粘贴入口（`formatJsonOrJsonString`）的预处理顺序**：
+1. `trim()`
+2. `escapeQuotedLineBreaks()` 修复跨行复制造成的非法 JSON（字符串内真换行）
+3. JSON.parse 多层 unwrap
+4. JSON 失败 → `pythonReprToJson()` 兜底
 
 ### 测试
 
-- 单测在 `src/test/jsonUtils.test.ts`，覆盖所有纯函数（`tryUnwrapJsonString` / `findStringValuesRaw` / `detectStringFormat` / `formatKeyPath` 等）
+- 单测在 `src/test/jsonUtils.test.ts` 与 `src/test/pythonRepr.test.ts`，覆盖所有纯函数（`tryUnwrapJsonString` / `tryUnwrapStructured` / `findStringValuesRaw` / `detectStringFormat` / `formatKeyPath` / `pythonReprToJson` 等）
 - 通过 `@vscode/test-cli` 启 Extension Development Host 运行，文件匹配 `**.test.ts`，编译后输出到 `out/test/`
 - Provider 类未做集成测试（成本高），靠 F5 手测
 

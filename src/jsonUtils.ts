@@ -1,15 +1,20 @@
 import * as vscode from 'vscode';
 import { Node, parseTree } from 'jsonc-parser';
+import { pythonReprToJson } from './pythonRepr';
+import { escapeQuotedLineBreaks } from './textNormalize';
+
+export type SourceKind = 'json' | 'python';
 
 export type JsonFormatResult = {
 	formatted: string;
-	sourceKind: 'json' | 'json_str';
+	sourceKind: 'json' | 'json_str' | 'python_str';
 };
 
 export type NestedJsonHit = {
 	range: vscode.Range;
 	parsedText: string;
 	keyPath: string;
+	sourceKind: SourceKind;
 };
 
 export type RawNestedJsonHit = {
@@ -17,6 +22,7 @@ export type RawNestedJsonHit = {
 	length: number;
 	parsedText: string;
 	keyPath: string;
+	sourceKind: SourceKind;
 };
 
 export type StringValueHit = {
@@ -24,6 +30,7 @@ export type StringValueHit = {
 	keyPath: string;
 	rawValue: string;
 	parsedText?: string;
+	sourceKind: SourceKind;
 };
 
 export type RawStringValueHit = {
@@ -32,6 +39,12 @@ export type RawStringValueHit = {
 	keyPath: string;
 	rawValue: string;
 	parsedText?: string;
+	sourceKind: SourceKind;
+};
+
+export type StructuredUnwrap = {
+	value: Record<string, unknown> | unknown[];
+	sourceKind: SourceKind;
 };
 
 const UNWRAP_DEPTH = 4;
@@ -72,13 +85,46 @@ export function tryUnwrapJsonString(raw: string): Record<string, unknown> | unkn
 	return undefined;
 }
 
+/**
+ * Try to unwrap a string as either a JSON container (with up to 4 levels of
+ * string-wrapping) or a Python repr literal. Returns the parsed container
+ * along with which source form succeeded.
+ */
+export function tryUnwrapStructured(raw: string): StructuredUnwrap | undefined {
+	const jsonValue = tryUnwrapJsonString(raw);
+	if (jsonValue) {
+		return { value: jsonValue, sourceKind: 'json' };
+	}
+
+	const pyResult = pythonReprToJson(raw.trim());
+	if (!pyResult) {
+		return undefined;
+	}
+
+	try {
+		const parsed: unknown = JSON.parse(pyResult.json);
+		if (isJsonContainer(parsed)) {
+			return { value: parsed, sourceKind: 'python' };
+		}
+	} catch {
+		// fall through
+	}
+
+	return undefined;
+}
+
 export function formatJsonOrJsonString(text: string): JsonFormatResult | undefined {
 	const trimmed = text.trim();
 	if (trimmed.length === 0) {
 		return undefined;
 	}
 
-	let candidate = trimmed;
+	// Repair input copied from a terminal that broke lines mid-string.
+	// Newlines inside a quoted literal become \n escapes; newlines outside
+	// strings (valid whitespace) are preserved untouched.
+	const repaired = escapeQuotedLineBreaks(trimmed);
+
+	let candidate = repaired;
 	let parsedFromString = false;
 
 	for (let depth = 0; depth < UNWRAP_DEPTH; depth++) {
@@ -86,7 +132,8 @@ export function formatJsonOrJsonString(text: string): JsonFormatResult | undefin
 		try {
 			parsed = JSON.parse(candidate);
 		} catch {
-			return undefined;
+			// JSON parsing failed — drop out of the loop and try Python below.
+			break;
 		}
 
 		if (isJsonContainer(parsed)) {
@@ -106,6 +153,24 @@ export function formatJsonOrJsonString(text: string): JsonFormatResult | undefin
 		}
 		candidate = next;
 		parsedFromString = true;
+	}
+
+	// Python repr fallback. We always probe against the repaired input
+	// rather than `candidate`, because Python repr only makes sense at the
+	// top level — we don't try to unwrap it from string-wrapped layers.
+	const pyResult = pythonReprToJson(repaired);
+	if (pyResult) {
+		try {
+			const parsed: unknown = JSON.parse(pyResult.json);
+			if (isJsonContainer(parsed)) {
+				return {
+					formatted: JSON.stringify(parsed, null, '\t'),
+					sourceKind: 'python_str',
+				};
+			}
+		} catch {
+			// fall through
+		}
 	}
 
 	return undefined;
@@ -136,6 +201,7 @@ export function findNestedJsonStringsRaw(text: string): RawNestedJsonHit[] {
 			length: hit.length,
 			parsedText: hit.parsedText,
 			keyPath: hit.keyPath,
+			sourceKind: hit.sourceKind,
 		}));
 }
 
@@ -148,6 +214,7 @@ export function findNestedJsonStrings(document: vscode.TextDocument): NestedJson
 		),
 		parsedText: hit.parsedText,
 		keyPath: hit.keyPath,
+		sourceKind: hit.sourceKind,
 	}));
 }
 
@@ -172,6 +239,7 @@ export function findStringValues(document: vscode.TextDocument): StringValueHit[
 		keyPath: hit.keyPath,
 		rawValue: hit.rawValue,
 		parsedText: hit.parsedText,
+		sourceKind: hit.sourceKind,
 	}));
 }
 
@@ -181,13 +249,14 @@ function walkAllStrings(node: Node, path: Array<string | number>, hits: RawStrin
 		if (typeof value !== 'string') {
 			return;
 		}
-		const unwrapped = tryUnwrapJsonString(value);
+		const unwrapped = tryUnwrapStructured(value);
 		hits.push({
 			offset: node.offset,
 			length: node.length,
 			keyPath: formatKeyPath(path),
 			rawValue: value,
-			parsedText: unwrapped ? JSON.stringify(unwrapped, null, '\t') : undefined,
+			parsedText: unwrapped ? JSON.stringify(unwrapped.value, null, '\t') : undefined,
+			sourceKind: unwrapped?.sourceKind ?? 'json',
 		});
 		return;
 	}
