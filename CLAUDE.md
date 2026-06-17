@@ -29,7 +29,7 @@ yarn package          # vsce 本地打包出 .vsix
 | `src/jsonUtils.ts` | 纯函数：`formatJsonOrJsonString` / `stringifyJsonText` / `tryUnwrapJsonString`（JSON-only）/ `tryUnwrapStructured`（JSON 失败时兜底走 Python，返回 `sourceKind: 'json' \| 'python'`）/ `findStringValues` / `findNestedJsonStrings` / `detectStringFormat`（Markdown 启发式打分） |
 | `src/pythonRepr.ts` | 纯函数 `pythonReprToJson(input)`：手写递归下降解析器，把 Python `repr(dict)` 字面量转为合法 JSON 文本。覆盖 `ast.literal_eval` 子集（dict/list/tuple/str/num/bool/None），遇到函数调用 / 对象 repr / bytes / set literal 整体放弃 |
 | `src/textNormalize.ts` | 纯函数 `escapeQuotedLineBreaks(input)`：单趟扫描修复"字符串字面量内部含真换行"的输入（终端宽度折行造成）。识别 `"..."` 与 `'...'` 两类引号、honors `\\` 转义、CRLF 算单换行。string 外的换行原样保留。fast path：无换行直接返回 |
-| `src/hoverProvider.ts` | `NestedJsonHoverProvider`：覆盖所有 string value，按内容分类渲染 JSON / Markdown / 纯文本，Hover 浮窗内嵌 command URI 触发 parse。根据 `hit.sourceKind` 区分显示 "Parsed JSON" 还是 "Parsed Python dict" |
+| `src/hoverProvider.ts` | `NestedJsonHoverProvider`：覆盖所有 string value，按内容分类渲染 JSON / Markdown / 纯文本。预览超 `MAX_PREVIEW_CHARS` 截断；浮窗顶部第二行与底部各放一个 "Open in side panel" 按钮（同一 token 复用）。按钮**不内嵌 content**，只带 `parseNestedCommand.ts` store 的 token（见下方开发注意事项）。根据 `hit.sourceKind` 区分显示 "Parsed JSON" 还是 "Parsed Python dict" |
 | `src/codeLensProvider.ts` | `NestedJsonCodeLensProvider`（按 `sourceKind` 显示 `▸ Parse JSON` 或 `▸ Parse Python dict`）+ `parseNestedJsonCommand`（按 `kind` 决定 `.json`/`.md`/`.txt` + `Parsed-`/`Value-`/`Parsed-py-` 前缀，`ViewColumn.Beside` + `preview:false` 在右侧多 Tab 打开） |
 | `src/logger.ts` | OutputChannel 包装，全模块共用 |
 
@@ -66,7 +66,7 @@ yarn package          # vsce 本地打包出 .vsix
 - 扩展激活时机由 `activationEvents` 控制：当前在 `plaintext`、`json`、`jsonc` 语言模式下激活
 - `package.json` 的 `main` 指向 `./out/extension.js`
 - 修改代码后需重新编译（`yarn compile`）或开 watch 模式
-- **Hover 内嵌 command 链接**：必须设 `MarkdownString.isTrusted = { enabledCommands: [PARSE_COMMAND_ID] }`，命令参数用 `encodeURIComponent(JSON.stringify([...]))` 序列化
+- **Hover 打开链接走 token、不内嵌 content**：大 string value 若把 content 塞进 `command:` URI，编码后可达 100KB+，**超出 hover 渲染层对 command href 的承载，点击时 args 会整体丢失**（命令收到全 `undefined`，旧版即因此在 `sanitize` 崩溃）。改由 `stashPendingOpen` 把完整 content 存进 `parseNestedCommand.ts` 的模块级 store（带 LRU 上限 `MAX_PENDING_OPENS`），URI 只带短 token，`PARSE_BY_TOKEN_COMMAND_ID` 命令用 `takePendingOpen` 取回；`MarkdownString.isTrusted` 须含 `[PARSE_BY_TOKEN_COMMAND_ID]`。**CodeLens 不受此限**（`command.arguments` 走宿主 RPC 可携带大 payload，仍用 `PARSE_COMMAND_ID` + 真 content）
 - **`extension.ts` 中的 `formatInFlight` 锁**和 `firstNonWhitespaceChar` 提前过滤是粘贴热路径的关键优化，改 `onDidChangeTextDocument` 监听时不要破坏
 - **`.vscodeignore` 不要写 `node_modules/**`** —— vsce 默认会自动只包含生产依赖，手写规则反而覆盖它，导致运行时报 `Cannot find module 'jsonc-parser'`（详见 `docs/PUBLISHING.md` 故障排查）
 

@@ -14,8 +14,10 @@ import { NestedJsonHoverProvider } from './hoverProvider';
 import { initLogger, logError, logInfo } from './logger';
 import {
 	OpenKind,
+	PARSE_BY_TOKEN_COMMAND_ID,
 	PARSE_COMMAND_ID,
 	parseNestedJsonCommand,
+	takePendingOpen,
 } from './parseNestedCommand';
 
 const formatInFlight = new Set<string>();
@@ -64,6 +66,28 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
+	// Hover links can't carry large content through their command URI, so the
+	// hover stashes the content and passes only a token; trade it back here.
+	const parseByTokenDisposable = vscode.commands.registerCommand(
+		PARSE_BY_TOKEN_COMMAND_ID,
+		(token: string) => {
+			const open = takePendingOpen(token);
+			if (!open) {
+				logError(`Hover open token expired or missing (token=${token}).`, token);
+				void vscode.window.showWarningMessage(
+					'BetterJsonExplorer: 内容已过期，请重新悬停后再点击打开。'
+				);
+				return;
+			}
+			parseNestedJsonCommand(open.content, open.keyPath, open.kind).then(
+				undefined,
+				(error: unknown) => {
+					logError('Failed to open parsed content document.', error);
+				}
+			);
+		}
+	);
+
 	const convertDisposable = vscode.commands.registerCommand(
 		CONVERT_TO_JSON_COMMAND_ID,
 		(uriString?: string) => {
@@ -98,6 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
 		changeDisposable,
 		toggleDisposable,
 		parseNestedDisposable,
+		parseByTokenDisposable,
 		convertDisposable,
 		hoverDisposable,
 		codeLensDisposable,

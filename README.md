@@ -35,7 +35,8 @@ VS Code 扩展：更好的 JSON 预览与编辑工具。
    - **Python dict 字符串**（如 `"{'a': 1, 'ok': True}"`）→ 转为 JSON 后展开渲染，Hover 标题为 "Parsed Python dict"
    - **Markdown 文本**（标题/列表/代码围栏/链接/表格等）→ 直接以 markdown 渲染
    - **纯文本/代码** → code block 等宽显示，转义字符（`\n`/`\t`）按真实换行/制表展示
-   - Hover 浮窗底部带 `▸ Open ... in side panel` 链接，点击在右侧分栏新开 untitled 文档：
+   - 超大内容预览自动截断（保留前 2000 字符），截断时显示省略提示，避免浮窗被撑爆
+   - Hover 浮窗**顶部第二行**和**底部**各带一个 `▸ Open ... in side panel` 链接，点击在右侧分栏新开 untitled 文档：
      - 嵌套 JSON → `Parsed-<keyPath>.json`
      - Python dict → `Parsed-py-<keyPath>.json`
      - Markdown → `Value-<keyPath>.md`（可用 `Cmd+Shift+V` 触发 markdown 预览）
